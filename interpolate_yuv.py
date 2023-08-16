@@ -10,6 +10,7 @@ from utility import read_frame_yuv2rgb, tensor2rgb
 from omegaconf import OmegaConf
 from main import instantiate_from_config
 from ldm.models.diffusion.ddim import DDIMSampler
+import subprocess
 
 
 parser = argparse.ArgumentParser(description='Frame Interpolation Evaluation')
@@ -36,6 +37,7 @@ def main():
     model = instantiate_from_config(config.model)
     model.load_state_dict(torch.load(args.ckpt)['state_dict'])
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    print('Using device: {}'.format(device))
     model = model.to(device)
     model = model.eval()
     print('Model loaded successfully')
@@ -62,22 +64,7 @@ def main():
         print('Invalid size, should be \'<width>x<height>\'')
         return 
 
-    outname = '{}_{}x{}_{}fps_{}.mp4'.format(seq_name, width, height, args.out_fps, args.net)
-    writer = skvideo.io.FFmpegWriter(os.path.join(args.out_dir, outname), 
-        inputdict={
-            '-r': str(args.out_fps)
-        },
-        outputdict={
-            '-pix_fmt': 'yuv420p',
-            '-s': '{}x{}'.format(width,height),
-            '-r': str(args.out_fps),
-            '-vcodec': 'libx264',  #use the h.264 codec
-            '-crf': '0',           #set the constant rate factor to 0, which is lossless
-            '-preset':'veryslow'   #the slower the better compression, in princple, try 
-                                #other options see https://trac.ffmpeg.org/wiki/Encode/H.264
-        }
-    ) 
-
+    # outname = '{}_{}x{}_{}fps_{}.mp4'.format(seq_name, width, height, args.out_fps, args.net)
     # Start interpolation
     print('Using model {} to upsample file {}'.format(args.net, fname))
     stream = open(args.input_yuv, 'r')
@@ -93,6 +80,25 @@ def main():
     num_frames = int(file_size // bytes_per_frame)
     rawFrame0 = Image.fromarray(read_frame_yuv2rgb(stream, width, height, 0, bit_depth, pix_fmt))
     frame0 = TF.normalize(TF.to_tensor(rawFrame0), (0.5, 0.5, 0.5), (0.5, 0.5, 0.5))[None,...].cuda()
+
+
+    # Initialize the FFmpeg subprocess
+    outname = 'video.mp4'
+    command = [
+        'ffmpeg',
+        '-y',  # Overwrite output file if it exists
+        '-f', 'rawvideo',
+        '-vcodec', 'rawvideo',
+        '-s', '{}x{}'.format(width, height),  # Size of input frames
+        '-pix_fmt', 'rgb24',  # Format of the input frames
+        '-r', str(args.out_fps),  # Input frame rate
+        '-i', '-',  # Read from stdin
+        '-an',  # No audio
+        os.path.join(args.out_dir, outname)  # Output file path
+    ]
+    process = subprocess.Popen(command, stdin=subprocess.PIPE)
+
+
     for t in tqdm(range(1, num_frames)):
         rawFrame1 = Image.fromarray(read_frame_yuv2rgb(stream, width, height, t, bit_depth, pix_fmt))
         frame1 = TF.normalize(TF.to_tensor(rawFrame1), (0.5, 0.5, 0.5), (0.5, 0.5, 0.5))[None,...].cuda()
@@ -111,18 +117,21 @@ def main():
                 out = model.decode_first_stage(out, xc, phi_prev_list, phi_next_list)
                 out =  torch.clamp(out, min=-1., max=1.) # interpolated frame in [-1,1]
 
-        # write to output video
-        writer.writeFrame(tensor2rgb(frame0)[0])
-        writer.writeFrame(tensor2rgb(out)[0])
+        # write the frame to the process
+        rgb_frame0 = tensor2rgb(frame0)[0]
+        process.stdin.write(rgb_frame0.tobytes())
+        rgb_out = tensor2rgb(out)[0]
+        process.stdin.write(rgb_out.tobytes())
 
         # update frame0
         frame0 = frame1
     
-    # write the last frame
-    writer.writeFrame(tensor2rgb(frame1)[0])
+    rgb_frame1 = tensor2rgb(frame1)[0]
+    process.stdin.write(rgb_frame1.tobytes())
 
-    stream.close()
-    writer.close() # close the writer
+    # Close the process
+    process.stdin.close()
+    process.wait()
 
 
 if __name__ == "__main__":

@@ -13,6 +13,41 @@ We observe that most existing learning-based VFI models are trained to minimise 
 <img src="https://danier97.github.io/LDMVFI/overall.svg" alt="Paper" width="60%">
 </p>
 
+# Docker approach
+## Interpolation
+#### Installation
+```
+git clone https://github.com/format37/LDMVFI.git
+cd LDMVFI
+sh build.sh
+```
+#### Prepare your yuv file
+```
+ffmpeg -i video.avi -pix_fmt yuv420p video.yuv
+```
+Put video.yuv file to `data/` folder  
+To check yuv video you can run:
+```
+
+```
+#### Download the model
+* [Pre-trained model](https://drive.google.com/file/d/1_Xx2fBYQT9O-6O3zjzX76O9XduGnCh_7/view?usp=share_link)
+* Put model file to model/ldmvfi-vqflow-f32-c256-concat_max.ckpt
+#### Run and connect to the docker container
+```
+sh run.sh
+```
+#### Interpolate
+Configure interpolate.sh file:
+* input_yuv: input video file path
+* size: width and height of the input video
+* out_fps: fps of the output video. Need to be 2x times more than input video fps
+```
+sh interpolate.sh
+```
+Get results in output folder
+
+# Conda approach
 ## Dependencies and Installation
 See [environment.yaml](./environment.yaml) for requirements on packages. Simple installation:
 ```
