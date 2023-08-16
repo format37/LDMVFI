@@ -21,15 +21,6 @@ git clone https://github.com/format37/LDMVFI.git
 cd LDMVFI
 sh build.sh
 ```
-#### Prepare your yuv file
-```
-ffmpeg -i video.avi -pix_fmt yuv420p video.yuv
-```
-Put video.yuv file to `data/` folder  
-To check yuv video you can run:
-```
-
-```
 #### Download the model
 * [Pre-trained model](https://drive.google.com/file/d/1_Xx2fBYQT9O-6O3zjzX76O9XduGnCh_7/view?usp=share_link)
 * Put model file to model/ldmvfi-vqflow-f32-c256-concat_max.ckpt
@@ -37,6 +28,16 @@ To check yuv video you can run:
 ```
 sh run.sh
 ```
+#### Prepare your yuv file
+```
+cd data
+ffmpeg -i video.avi -pix_fmt yuv420p video.yuv
+```
+To play yuv video you can run:
+```
+mplayer -demuxer rawvideo -rawvideo w=300:h=200:format=i420 video.yuv
+```
+Don't forget to set w and h to your video resolution to play video correctly
 #### Interpolate
 Configure interpolate.sh file:
 * input_yuv: input video file path
