@@ -42,7 +42,7 @@ Don't forget to set w and h to your video resolution to play video correctly
 Configure interpolate.sh file:
 * input_yuv: input video file path
 * size: width and height of the input video
-* out_fps: fps of the output video. Need to be 2x times more than input video fps
+* out_fps: fps of the output video. Need to be at least 2x times more than input video fps
 ```
 sh interpolate.sh
 ```

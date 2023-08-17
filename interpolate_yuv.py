@@ -11,6 +11,7 @@ from omegaconf import OmegaConf
 from main import instantiate_from_config
 from ldm.models.diffusion.ddim import DDIMSampler
 import subprocess
+import cv2
 
 
 parser = argparse.ArgumentParser(description='Frame Interpolation Evaluation')
@@ -83,20 +84,23 @@ def main():
 
 
     # Initialize the FFmpeg subprocess
-    outname = 'video.mp4'
+    outname = 'video.yuv'
     command = [
         'ffmpeg',
         '-y',  # Overwrite output file if it exists
         '-f', 'rawvideo',
         '-vcodec', 'rawvideo',
         '-s', '{}x{}'.format(width, height),  # Size of input frames
-        '-pix_fmt', 'rgb24',  # Format of the input frames
+        '-pix_fmt', 'yuv420p',
         '-r', str(args.out_fps),  # Input frame rate
         '-i', '-',  # Read from stdin
         '-an',  # No audio
+        '-vcodec', 'rawvideo',  # No compression
         os.path.join(args.out_dir, outname)  # Output file path
     ]
-    process = subprocess.Popen(command, stdin=subprocess.PIPE)
+    # process = subprocess.Popen(command, stdin=subprocess.PIPE) # For FFMPEG debugging
+    process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
 
 
     for t in tqdm(range(1, num_frames)):
@@ -119,15 +123,33 @@ def main():
 
         # write the frame to the process
         rgb_frame0 = tensor2rgb(frame0)[0]
-        process.stdin.write(rgb_frame0.tobytes())
+        # rgb_frame0 = (tensor2rgb(frame0)[0] * 255).astype('uint8')
+        # print('rgb_frame0.shape', rgb_frame0.shape)
+        # Convert the RGB frame to YUV
+        yuv_frame0 = cv2.cvtColor(rgb_frame0, cv2.COLOR_RGB2YUV_I420)
+        # process.stdin.write(rgb_frame0.tobytes())
+        process.stdin.write(yuv_frame0.tobytes())
+
         rgb_out = tensor2rgb(out)[0]
-        process.stdin.write(rgb_out.tobytes())
+        # rgb_out = (tensor2rgb(out)[0] * 255).astype('uint8')
+        # Convert the RGB frame to YUV
+        yuv_out = cv2.cvtColor(rgb_out, cv2.COLOR_RGB2YUV_I420)
+        # process.stdin.write(rgb_out.tobytes())
+        process.stdin.write(yuv_out.tobytes())
 
         # update frame0
         frame0 = frame1
+
+        # Debug:
+        # if t>1:
+        #     break
     
     rgb_frame1 = tensor2rgb(frame1)[0]
-    process.stdin.write(rgb_frame1.tobytes())
+    # rgb_frame1 = (tensor2rgb(frame1)[0] * 255).astype('uint8')
+    # Convert the RGB frame to YUV
+    yuv_frame1 = cv2.cvtColor(rgb_frame1, cv2.COLOR_RGB2YUV_I420)
+    # process.stdin.write(rgb_frame1.tobytes())
+    process.stdin.write(yuv_frame1.tobytes())
 
     # Close the process
     process.stdin.close()
