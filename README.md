@@ -46,7 +46,14 @@ Configure interpolate.sh file:
 ```
 sh interpolate.sh
 ```
-Get results in output folder
+Get results in output folder. To play yuv video you can run:
+```
+mplayer -demuxer rawvideo -rawvideo w=300:h=200:format=i420 video.yuv
+```
+To convert yuv to mp4 you can run:
+```
+ffmpeg -s 300x200 -i video.yuv -pix_fmt yuv420p -c:v libx264 video.mp4
+```
 
 # Conda approach
 ## Dependencies and Installation
